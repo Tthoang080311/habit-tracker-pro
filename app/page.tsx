@@ -59,7 +59,7 @@ interface FocusSessionLog {
   minutes: number;
   accomplished: string;
   distraction: string;
-  focusRating: number; // 1 - 5
+  focusRating: number;
 }
 
 interface RewardItem {
@@ -70,7 +70,7 @@ interface RewardItem {
 }
 
 interface DailyHistoryRecord {
-  date: string; // YYYY-MM-DD
+  date: string;
   completedFull: number;
   completedTwoMin: number;
   totalGood: number;
@@ -85,7 +85,6 @@ interface Habit {
   habit_type: HabitType;
   category: CategoryType;
   identity: string;
-  // Trường cho thói quen tốt
   anchor_cue: string;
   two_minute_version: string;
   temptation_bundle: string;
@@ -94,7 +93,6 @@ interface Habit {
   full_count_history?: number;
   two_min_count_history?: number;
   target_days?: number;
-  // Trường cho thói quen xấu
   trigger_cue: string;
   consequence: string;
   friction_step: string;
@@ -188,8 +186,6 @@ const DEFAULT_REWARDS: RewardItem[] = [
   },
 ];
 
-const getTodayKey = () => new Date().toISOString().split("T")[0];
-
 export default function AtomicDashboard() {
   const [habits, setHabits] = useState<Habit[]>(DEFAULT_HABITS);
   const [darkMode, setDarkMode] = useState<boolean>(true);
@@ -197,14 +193,18 @@ export default function AtomicDashboard() {
     "Đã kết nối trực tiếp với Supabase"
   );
 
-  // Bộ lọc & Chế độ xem mở rộng
+  // Lưu ngày hiện tại sau khi mount trên Client để tránh lỗi Prerender của Next.js 16
+  const [todayKey, setTodayKey] = useState<string>("");
+  const [selectedHeatmapDate, setSelectedHeatmapDate] = useState<string>("");
+
+  // Bộ lọc & Chế độ xem
   const [typeFilter, setTypeFilter] = useState<"ALL" | HabitType>("ALL");
   const [categoryFilter, setCategoryFilter] = useState<"ALL" | CategoryType>("ALL");
   const [activeTab, setActiveTab] = useState<
     "LIST" | "AI_INSIGHTS" | "STACK" | "HEATMAP" | "REWARDS"
   >("LIST");
 
-  // Bộ đếm giờ Tập trung (Đã fix lỗi tính phút)
+  // Bộ đếm giờ Tập trung
   const [timerSeconds, setTimerSeconds] = useState<number>(0);
   const [initialTimerSeconds, setInitialTimerSeconds] = useState<number>(0);
   const [timerRunning, setTimerRunning] = useState<boolean>(false);
@@ -216,7 +216,6 @@ export default function AtomicDashboard() {
   // Âm thanh nền Tập trung (Web Audio API - Brown Noise)
   const [ambientOn, setAmbientOn] = useState<boolean>(false);
   const audioCtxRef = useRef<AudioContext | null>(null);
-  const gainNodeRef = useRef<GainNode | null>(null);
 
   // Nhật ký sau phiên tập trung (Post-Session Reflection)
   const [focusLogs, setFocusLogs] = useState<FocusSessionLog[]>([]);
@@ -234,13 +233,10 @@ export default function AtomicDashboard() {
   const [newRewardTitle, setNewRewardTitle] = useState<string>("");
   const [newRewardCost, setNewRewardCost] = useState<number>(50);
 
-  // Dữ liệu Heatmap 12 tuần thực tế & chọn ngày
+  // Dữ liệu Heatmap 12 tuần
   const [dailyHistory, setDailyHistory] = useState<
     Record<string, DailyHistoryRecord>
   >({});
-  const [selectedHeatmapDate, setSelectedHeatmapDate] = useState<string>(
-    getTodayKey()
-  );
   const [simulateHeatmap, setSimulateHeatmap] = useState<boolean>(false);
 
   // Modal Thêm mới
@@ -268,8 +264,16 @@ export default function AtomicDashboard() {
   const [isSqlModalOpen, setIsSqlModalOpen] = useState<boolean>(false);
   const [copiedSql, setCopiedSql] = useState<boolean>(false);
 
-  // Tải dữ liệu từ localStorage + Đồng bộ từ Supabase
+  // Khởi tạo ngày hiện tại + Tải dữ liệu từ localStorage & Supabase (Chỉ chạy ở Client)
   useEffect(() => {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const dd = String(now.getDate()).padStart(2, "0");
+    const currentKey = `${yyyy}-${mm}-${dd}`;
+    setTodayKey(currentKey);
+    setSelectedHeatmapDate(currentKey);
+
     const savedLocal = localStorage.getItem("atomic_habits_pro_v2");
     const savedMinutes = localStorage.getItem("atomic_deep_work_minutes");
     const savedXp = localStorage.getItem("atomic_xp_points");
@@ -310,13 +314,13 @@ export default function AtomicDashboard() {
       try {
         const { data, error } = await supabase.from("habits").select("*");
         if (!error && data && data.length > 0) {
-          const merged: Habit[] = data.map((row: Record<string, unknown>) => {
-            const rowId = String(row.id ?? "");
+          const merged: Habit[] = data.map((row: Record<string, unknown>, idx: number) => {
+            const rowId = String(row.id ?? `supa-${idx}`);
             const existing = localData.find(
               (h) => h.id === rowId || h.title === String(row.title ?? "")
             );
             return {
-              id: rowId || Date.now().toString(),
+              id: rowId,
               title: String(row.title ?? existing?.title ?? "Thói quen mới"),
               habit_type:
                 (row.habit_type as HabitType) ?? existing?.habit_type ?? "good",
@@ -429,8 +433,9 @@ export default function AtomicDashboard() {
       deepWorkProgressPercent * 0.25
   );
 
+  // Tự động lưu lịch sử ngày hôm nay khi đã có todayKey trên Client
   useEffect(() => {
-    const todayKey = getTodayKey();
+    if (!todayKey) return;
     setDailyHistory((prev) => {
       const updated = {
         ...prev,
@@ -448,6 +453,7 @@ export default function AtomicDashboard() {
       return updated;
     });
   }, [
+    todayKey,
     completedFullCount,
     completedTwoMinCount,
     goodHabits.length,
@@ -470,6 +476,7 @@ export default function AtomicDashboard() {
     });
   };
 
+  // Trình tạo âm thanh nền Tập trung (Brown Noise bằng Web Audio API)
   const toggleAmbientSound = () => {
     if (ambientOn) {
       if (audioCtxRef.current) {
@@ -511,7 +518,6 @@ export default function AtomicDashboard() {
         whiteNoise.start(0);
 
         audioCtxRef.current = ctx;
-        gainNodeRef.current = gainNode;
         setAmbientOn(true);
       } catch {
         alert("Trình duyệt của bạn cần tương tác trước khi phát âm thanh.");
@@ -527,6 +533,7 @@ export default function AtomicDashboard() {
     };
   }, []);
 
+  // Đồng hồ đếm ngược
   useEffect(() => {
     if (!timerRunning || timerSeconds <= 0) return;
     const interval = setInterval(() => {
@@ -550,6 +557,7 @@ export default function AtomicDashboard() {
     return () => clearInterval(interval);
   }, [timerRunning, timerSeconds, initialTimerSeconds]);
 
+  // Đếm ngược 5 giây ở Modal Phản tỉnh
   useEffect(() => {
     if (!relapseTarget || relapseCountdown <= 0) return;
     const timer = setTimeout(() => {
@@ -574,10 +582,11 @@ export default function AtomicDashboard() {
 
   const handleSaveReflection = (e: React.FormEvent) => {
     e.preventDefault();
+    const now = new Date();
     const newLog: FocusSessionLog = {
-      id: Date.now().toString(),
-      date: new Date().toLocaleDateString("vi-VN"),
-      time: new Date().toLocaleTimeString("vi-VN", {
+      id: String(now.getTime()),
+      date: now.toLocaleDateString("vi-VN"),
+      time: now.toLocaleTimeString("vi-VN", {
         hour: "2-digit",
         minute: "2-digit",
       }),
@@ -679,9 +688,10 @@ export default function AtomicDashboard() {
 
   const confirmRelapse = () => {
     if (!relapseTarget) return;
+    const now = new Date();
     const logEntry: RelapseLog = {
-      id: Date.now().toString(),
-      date: new Date().toLocaleDateString("vi-VN"),
+      id: String(now.getTime()),
+      date: now.toLocaleDateString("vi-VN"),
       reason: relapseReason.trim() || "Không ghi rõ nguyên nhân",
     };
 
@@ -707,7 +717,7 @@ export default function AtomicDashboard() {
     if (!newHabit.title.trim()) return;
 
     const created: Habit = {
-      id: Date.now().toString(),
+      id: String(new Date().getTime()),
       title: newHabit.title.trim(),
       habit_type: newHabit.habit_type,
       category: newHabit.category,
@@ -792,7 +802,7 @@ export default function AtomicDashboard() {
     e.preventDefault();
     if (!newRewardTitle.trim()) return;
     const item: RewardItem = {
-      id: Date.now().toString(),
+      id: String(new Date().getTime()),
       title: newRewardTitle.trim(),
       cost: Math.max(10, Number(newRewardCost)),
       redeemedCount: 0,
@@ -846,10 +856,23 @@ export default function AtomicDashboard() {
 
   const aiMetrics = generateAiInsights();
 
+  // Tạo danh sách 84 ngày an toàn với SSR (Không gọi new Date() khi chưa có todayKey)
   const heatmapDays = Array.from({ length: 84 }).map((_, idx) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (83 - idx));
-    const dateKey = d.toISOString().split("T")[0];
+    if (!todayKey) {
+      return {
+        dateKey: `day-${idx}`,
+        displayDate: `Ngày ${idx + 1}`,
+        isToday: idx === 83,
+        score: idx === 83 ? overallDailyProgress : 0,
+      };
+    }
+
+    const [y, m, dayNum] = todayKey.split("-").map(Number);
+    const d = new Date(y, m - 1, dayNum - (83 - idx));
+    const yy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    const dateKey = `${yy}-${mm}-${dd}`;
     const record = dailyHistory[dateKey];
 
     let score = record ? record.scorePercent : 0;
@@ -859,17 +882,15 @@ export default function AtomicDashboard() {
 
     return {
       dateKey,
-      displayDate: d.toLocaleDateString("vi-VN", {
-        day: "2-digit",
-        month: "2-digit",
-      }),
+      displayDate: `${dd}/${mm}`,
       isToday: idx === 83,
       score,
-      record,
     };
   });
 
-  const selectedDayDetail = dailyHistory[selectedHeatmapDate];
+  const selectedDayDetail = selectedHeatmapDate
+    ? dailyHistory[selectedHeatmapDate]
+    : undefined;
 
   const sqlSnippet = `-- Chạy đoạn mã này trong Supabase SQL Editor để mở rộng bảng habits:
 ALTER TABLE habits ADD COLUMN IF NOT EXISTS habit_type TEXT DEFAULT 'good';
@@ -1514,8 +1535,9 @@ ALTER TABLE habits ADD COLUMN IF NOT EXISTS clean_streak INTEGER DEFAULT 0;`;
                       <div className="flex justify-between items-center text-[11px] text-slate-400">
                         <span>
                           Tiến độ định hình phản xạ ({habit.streak}/{targetDays}{" "}
-                          ngày) • Thực thi sâu: {habit.full_count_history ?? habit.streak}{" "}
-                          lần | 2-phút: {habit.two_min_count_history ?? 0} lần
+                          ngày) • Thực thi sâu:{" "}
+                          {habit.full_count_history ?? habit.streak} lần |
+                          2-phút: {habit.two_min_count_history ?? 0} lần
                         </span>
                         <span className="font-bold text-indigo-400">
                           {habitProgressPercent}%
@@ -1632,8 +1654,8 @@ ALTER TABLE habits ADD COLUMN IF NOT EXISTS clean_streak INTEGER DEFAULT 0;`;
                   <div className="pt-2 border-t border-rose-950/60 space-y-1.5">
                     <div className="flex justify-between items-center text-[11px] text-slate-400">
                       <span>
-                        Tiến độ vượt ngưỡng 21 ngày cai nghiện ({habit.clean_streak}/
-                        {targetDays} ngày sạch)
+                        Tiến độ vượt ngưỡng 21 ngày cai nghiện (
+                        {habit.clean_streak}/{targetDays} ngày sạch)
                       </span>
                       <span className="font-bold text-emerald-400">
                         {habitProgressPercent}%
@@ -1672,17 +1694,21 @@ ALTER TABLE habits ADD COLUMN IF NOT EXISTS clean_streak INTEGER DEFAULT 0;`;
                       Bản Phân tích Học tập & Kiểm toán Hành vi (AI Study Audit)
                     </h2>
                     <p className="text-xs text-slate-400">
-                      Đánh giá thẳng thắn dựa trên dữ liệu thực thi thực tế — Không
-                      tô hồng thành tích
+                      Đánh giá thẳng thắn dựa trên dữ liệu thực thi thực tế —
+                      Không tô hồng thành tích
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-400">Mục tiêu Deep Work/ngày:</span>
+                  <span className="text-xs text-slate-400">
+                    Mục tiêu Deep Work/ngày:
+                  </span>
                   <select
                     value={dailyDeepWorkGoal}
-                    onChange={(e) => setDailyDeepWorkGoal(Number(e.target.value))}
+                    onChange={(e) =>
+                      setDailyDeepWorkGoal(Number(e.target.value))
+                    }
                     className="bg-[#070a12] border border-slate-700 rounded-lg px-2 py-1 text-xs text-indigo-300"
                   >
                     <option value={60}>60 phút</option>
@@ -1729,7 +1755,7 @@ ALTER TABLE habits ADD COLUMN IF NOT EXISTS clean_streak INTEGER DEFAULT 0;`;
                   <p className="text-xs text-slate-300 leading-relaxed">
                     {badHabits.some((b) => b.relapsed_today)
                       ? "🚨 Bạn vừa tái phạm thói quen xấu hôm nay. Việc nạp dopamine nhanh từ mạng xã hội/Reels làm giảm ngưỡng chịu đựng độ khó khi giải Toán & đọc hiểu tiếng Anh học thuật."
-                      : `🛡️ Chuỗi kiểm soát hiện tại giúp bảo toàn năng lượng nhận thức (Cognitive Load) cho các phiên học nặng.`}
+                      : "🛡️ Chuỗi kiểm soát hiện tại giúp bảo toàn năng lượng nhận thức (Cognitive Load) cho các phiên học nặng."}
                   </p>
                 </div>
 
@@ -1757,7 +1783,9 @@ ALTER TABLE habits ADD COLUMN IF NOT EXISTS clean_streak INTEGER DEFAULT 0;`;
 
               <div className="pt-3 space-y-3">
                 <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-                  <span>📓 Nhật ký Nghiệm thu Phiên học (Focus Session Logs)</span>
+                  <span>
+                    📓 Nhật ký Nghiệm thu Phiên học (Focus Session Logs)
+                  </span>
                   <span className="text-xs font-normal text-slate-400">
                     ({focusLogs.length} phiên đã ghi nhận)
                   </span>
@@ -1765,7 +1793,10 @@ ALTER TABLE habits ADD COLUMN IF NOT EXISTS clean_streak INTEGER DEFAULT 0;`;
 
                 {focusLogs.length === 0 ? (
                   <div className="p-4 rounded-xl bg-black/20 border border-slate-800 text-xs text-slate-400">
-                    Chưa có bản ghi nghiệm thu nào. Hãy chạy một phiên Pomodoro / Deep Work trên Trạm Tập Trung và bấm <strong>&ldquo;Nghiệm thu phiên&rdquo;</strong> để theo dõi chất lượng học thực tế của bạn.
+                    Chưa có bản ghi nghiệm thu nào. Hãy chạy một phiên Pomodoro /
+                    Deep Work trên Trạm Tập Trung và bấm{" "}
+                    <strong>&ldquo;Nghiệm thu phiên&rdquo;</strong> để theo dõi
+                    chất lượng học thực tế của bạn.
                   </div>
                 ) : (
                   <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
@@ -1930,7 +1961,7 @@ ALTER TABLE habits ADD COLUMN IF NOT EXISTS clean_streak INTEGER DEFAULT 0;`;
             <div className="p-4 rounded-xl bg-black/25 border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs">
               <div>
                 <span className="font-bold text-indigo-400 uppercase">
-                  📅 Chi tiết ngày {selectedHeatmapDate}:
+                  📅 Chi tiết ngày {selectedHeatmapDate || "Hôm nay"}:
                 </span>
                 {selectedDayDetail ? (
                   <p className="text-slate-300 mt-1">
@@ -2115,9 +2146,13 @@ ALTER TABLE habits ADD COLUMN IF NOT EXISTS clean_streak INTEGER DEFAULT 0;`;
                     }
                     className="w-full bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-xs text-amber-400 font-semibold"
                   >
-                    <option value={5}>5 ⭐ - Tập trung tuyệt đối (Flow State)</option>
+                    <option value={5}>
+                      5 ⭐ - Tập trung tuyệt đối (Flow State)
+                    </option>
                     <option value={4}>4 ⭐ - Tập trung tốt</option>
-                    <option value={3}>3 ⭐ - Trung bình, đôi lúc mất tập trung</option>
+                    <option value={3}>
+                      3 ⭐ - Trung bình, đôi lúc mất tập trung
+                    </option>
                     <option value={2}>2 ⭐ - Hay bị ngắt quãng</option>
                     <option value={1}>1 ⭐ - Ngồi học hình thức</option>
                   </select>
