@@ -1,9 +1,21 @@
 'use client';
-import { useState, useEffect } from 'react';
-// Import supabase client của bạn ở đây: import { createClient } from '@/utils/supabase/client';
+import React, { useState } from 'react';
+
+interface Habit {
+  id: string;
+  title: string;
+  habit_type: 'good' | 'bad';
+  stack_trigger?: string;
+  rule_2min?: string;
+  trigger_cue?: string;
+  consequence?: string;
+  streak: number;
+  clean_streak: number;
+  completed_today?: boolean;
+}
 
 export default function HabitTracker() {
-  const [habits, setHabits] = useState([
+  const [habits, setHabits] = useState<Habit[]>([
     {
       id: '1',
       title: 'Làm bài tập toán trong 1h30p',
@@ -11,6 +23,7 @@ export default function HabitTracker() {
       stack_trigger: 'Sau khi ngồi vào bàn học',
       rule_2min: 'Làm 1 bài duy nhất',
       streak: 1,
+      clean_streak: 0,
       completed_today: true
     },
     {
@@ -19,33 +32,31 @@ export default function HabitTracker() {
       habit_type: 'bad',
       trigger_cue: 'Cảm giác chán nản / Cầm điện thoại trên giường',
       consequence: 'Mệt mỏi sáng hôm sau, mất tập trung học toán',
-      clean_streak: 5,
-      failed_today: false
+      streak: 0,
+      clean_streak: 5
     }
   ]);
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [newHabit, setNewHabit] = useState({
     title: '',
-    habit_type: 'good',
+    habit_type: 'good' as 'good' | 'bad',
     stack_trigger: '',
     rule_2min: '',
     trigger_cue: '',
     consequence: ''
   });
 
-  // Thêm thói quen mới
-  const handleAddHabit = (e) => {
+  const handleAddHabit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newHabit.title) return;
 
-    const item = {
+    const item: Habit = {
       id: Date.now().toString(),
       ...newHabit,
       streak: 0,
       clean_streak: 0,
-      completed_today: false,
-      failed_today: false
+      completed_today: false
     };
 
     setHabits([item, ...habits]);
@@ -53,7 +64,7 @@ export default function HabitTracker() {
     setIsModalOpen(false);
   };
 
-  const toggleGoodHabit = (id) => {
+  const toggleGoodHabit = (id: string) => {
     setHabits(habits.map(h => {
       if (h.id === id) {
         const nextCompleted = !h.completed_today;
@@ -67,10 +78,10 @@ export default function HabitTracker() {
     }));
   };
 
-  const handleRelapseBadHabit = (id) => {
+  const handleRelapseBadHabit = (id: string) => {
     setHabits(habits.map(h => {
       if (h.id === id) {
-        return { ...h, clean_streak: 0, failed_today: true };
+        return { ...h, clean_streak: 0 };
       }
       return h;
     }));
@@ -149,7 +160,6 @@ export default function HabitTracker() {
                 </div>
               );
             } else {
-              // Thói quen xấu (Bad Habit Breaker)
               return (
                 <div key={habit.id} className="bg-[#1a1318] border border-rose-950/50 rounded-2xl p-5 shadow-xl hover:border-rose-900/60 transition-all flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                   <div className="space-y-1">
@@ -194,7 +204,7 @@ export default function HabitTracker() {
                   <label className="block text-xs font-medium text-slate-400 mb-1">Loại thói quen</label>
                   <select 
                     value={newHabit.habit_type}
-                    onChange={(e) => setNewHabit({...newHabit, habit_type: e.target.value})}
+                    onChange={(e) => setNewHabit({...newHabit, habit_type: e.target.value as 'good' | 'bad'})}
                     className="w-full bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
                   >
                     <option value="good">Xây dựng thói quen tốt</option>
