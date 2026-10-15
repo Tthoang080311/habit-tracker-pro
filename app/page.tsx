@@ -405,13 +405,11 @@ export default function AtomicDashboard() {
   const completedGoodCount = completedFullCount + completedTwoMinCount;
   const cleanBadCount = badHabits.filter((h) => !h.relapsed_today).length;
 
-  // Tỷ lệ hoàn thành số lượng (Surface Rate)
   const totalRate =
     goodHabits.length > 0
       ? Math.round((completedGoodCount / goodHabits.length) * 100)
       : 100;
 
-  // Điểm tiến độ thực chất trong ngày (Full = 1.0, 2-Min = 0.35 để tránh lạm dụng 2 phút)
   const weightedGoodScore =
     goodHabits.length > 0
       ? ((completedFullCount * 1.0 + completedTwoMinCount * 0.35) /
@@ -425,14 +423,12 @@ export default function AtomicDashboard() {
     Math.round((deepWorkMinutes / dailyDeepWorkGoal) * 100)
   );
 
-  // Tiến độ Tổng thể Ngày (%) kết hợp 3 trụ cột: Thói quen tốt (50%) + Kiểm soát thói quen xấu (25%) + Deep Work (25%)
   const overallDailyProgress = Math.round(
     weightedGoodScore * 0.5 +
       badControlScore * 0.25 +
       deepWorkProgressPercent * 0.25
   );
 
-  // Tự động cập nhật bản ghi lịch sử của ngày hôm nay cho Heatmap
   useEffect(() => {
     const todayKey = getTodayKey();
     setDailyHistory((prev) => {
@@ -474,7 +470,6 @@ export default function AtomicDashboard() {
     });
   };
 
-  // Trình tạo âm thanh nền Tập trung (Brown Noise bằng Web Audio API)
   const toggleAmbientSound = () => {
     if (ambientOn) {
       if (audioCtxRef.current) {
@@ -497,7 +492,7 @@ export default function AtomicDashboard() {
           const white = Math.random() * 2 - 1;
           output[i] = (lastOut + 0.02 * white) / 1.02;
           lastOut = output[i];
-          output[i] *= 0.15; // Âm lượng dịu nhẹ
+          output[i] *= 0.15;
         }
         const whiteNoise = ctx.createBufferSource();
         whiteNoise.buffer = noiseBuffer;
@@ -532,7 +527,6 @@ export default function AtomicDashboard() {
     };
   }, []);
 
-  // Xử lý đồng hồ đếm ngược (Đã sửa lỗi cộng cứng +2 phút)
   useEffect(() => {
     if (!timerRunning || timerSeconds <= 0) return;
     const interval = setInterval(() => {
@@ -545,7 +539,7 @@ export default function AtomicDashboard() {
             localStorage.setItem("atomic_deep_work_minutes", String(nextM));
             return nextM;
           });
-          addXp(earnedMins); // 1 phút tập trung = +1 XP
+          addXp(earnedMins);
           setPendingSessionMinutes(earnedMins);
           setIsReflectionOpen(true);
           return 0;
@@ -556,7 +550,6 @@ export default function AtomicDashboard() {
     return () => clearInterval(interval);
   }, [timerRunning, timerSeconds, initialTimerSeconds]);
 
-  // Đếm ngược 5 giây ở Modal Phản tỉnh thói quen xấu
   useEffect(() => {
     if (!relapseTarget || relapseCountdown <= 0) return;
     const timer = setTimeout(() => {
@@ -579,7 +572,6 @@ export default function AtomicDashboard() {
     return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
   };
 
-  // Lưu nhật ký sau phiên học
   const handleSaveReflection = (e: React.FormEvent) => {
     e.preventDefault();
     const newLog: FocusSessionLog = {
@@ -605,7 +597,6 @@ export default function AtomicDashboard() {
     setIsReflectionOpen(false);
   };
 
-  // Cập nhật trạng thái thói quen tốt
   const updateGoodHabitStatus = async (habit: Habit, targetStatus: LogStatus) => {
     const isTogglingOff = habit.today_status === targetStatus;
     const nextStatus: LogStatus = isTogglingOff ? "NONE" : targetStatus;
@@ -671,7 +662,6 @@ export default function AtomicDashboard() {
     } catch {}
   };
 
-  // Cộng thêm 1 ngày sạch cho thói quen xấu
   const markBadHabitCleanToday = (id: string) => {
     const updated = habits.map((h) => {
       if (h.id === id) {
@@ -687,7 +677,6 @@ export default function AtomicDashboard() {
     saveHabitsState(updated);
   };
 
-  // Xác nhận tái phạm
   const confirmRelapse = () => {
     if (!relapseTarget) return;
     const logEntry: RelapseLog = {
@@ -713,7 +702,6 @@ export default function AtomicDashboard() {
     setRelapseReason("");
   };
 
-  // Thêm thói quen mới
   const handleAddHabit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newHabit.title.trim()) return;
@@ -790,7 +778,6 @@ export default function AtomicDashboard() {
     } catch {}
   };
 
-  // Đổi phần thưởng trong Kho Phần Thưởng
   const redeemReward = (reward: RewardItem) => {
     if (xpPoints < reward.cost) return;
     addXp(-reward.cost);
@@ -817,14 +804,12 @@ export default function AtomicDashboard() {
     setNewRewardCost(50);
   };
 
-  // Lọc danh sách hiển thị
   const filteredHabits = habits.filter((h) => {
     const matchType = typeFilter === "ALL" || h.habit_type === typeFilter;
     const matchCat = categoryFilter === "ALL" || h.category === categoryFilter;
     return matchType && matchCat;
   });
 
-  // HỆ THỐNG PHÂN TÍCH AI INSIGHT (Tư duy phản biện & Đánh giá khách quan)
   const generateAiInsights = () => {
     const totalFullHistory = goodHabits.reduce(
       (acc, h) => acc + (h.full_count_history ?? h.streak),
@@ -861,7 +846,6 @@ export default function AtomicDashboard() {
 
   const aiMetrics = generateAiInsights();
 
-  // Tạo danh sách 84 ngày gần nhất cho Heatmap
   const heatmapDays = Array.from({ length: 84 }).map((_, idx) => {
     const d = new Date();
     d.setDate(d.getDate() - (83 - idx));
@@ -1007,7 +991,6 @@ ALTER TABLE habits ADD COLUMN IF NOT EXISTS clean_streak INTEGER DEFAULT 0;`;
             </div>
           </div>
 
-          {/* Thanh bar chính */}
           <div className="w-full h-3.5 bg-slate-800/90 rounded-full overflow-hidden p-0.5 border border-slate-700/60">
             <div
               className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-cyan-400 to-emerald-400 transition-all duration-500"
@@ -1015,7 +998,6 @@ ALTER TABLE habits ADD COLUMN IF NOT EXISTS clean_streak INTEGER DEFAULT 0;`;
             />
           </div>
 
-          {/* 3 Thanh tiến độ thành phần */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 text-xs">
             <div className="space-y-1">
               <div className="flex justify-between text-slate-400">
@@ -1109,7 +1091,6 @@ ALTER TABLE habits ADD COLUMN IF NOT EXISTS clean_streak INTEGER DEFAULT 0;`;
           </div>
 
           <div className="flex flex-wrap items-center gap-2 self-end lg:self-center">
-            {/* Nút bật/tắt âm thanh nền Brown Noise */}
             <button
               onClick={toggleAmbientSound}
               title="Bật/tắt âm thanh Brown Noise giúp cô lập sự chú ý"
@@ -1423,7 +1404,7 @@ ALTER TABLE habits ADD COLUMN IF NOT EXISTS clean_streak INTEGER DEFAULT 0;`;
           )}
         </section>
 
-        {/* TAB 1: DANH SÁCH THÓI QUEN (CÓ THANH TIẾN ĐỘ % MỐC MỤC TIÊU) */}
+        {/* TAB 1: DANH SÁCH THÓI QUEN */}
         {activeTab === "LIST" && (
           <section className="space-y-4">
             {filteredHabits.map((habit) => {
@@ -1529,7 +1510,6 @@ ALTER TABLE habits ADD COLUMN IF NOT EXISTS clean_streak INTEGER DEFAULT 0;`;
                       </div>
                     </div>
 
-                    {/* THANH TIẾN ĐỘ % MỤC TIÊU DÀI HẠN CỦA THÓI QUEN */}
                     <div className="pt-2 border-t border-slate-800/70 space-y-1.5">
                       <div className="flex justify-between items-center text-[11px] text-slate-400">
                         <span>
@@ -1552,7 +1532,6 @@ ALTER TABLE habits ADD COLUMN IF NOT EXISTS clean_streak INTEGER DEFAULT 0;`;
                 );
               }
 
-              // THẺ LOẠI BỎ THÓI QUEN XẤU
               return (
                 <div
                   key={habit.id}
@@ -1650,7 +1629,6 @@ ALTER TABLE habits ADD COLUMN IF NOT EXISTS clean_streak INTEGER DEFAULT 0;`;
                     </div>
                   </div>
 
-                  {/* THANH TIẾN ĐỘ CAI THÓI QUEN XẤU (%) */}
                   <div className="pt-2 border-t border-rose-950/60 space-y-1.5">
                     <div className="flex justify-between items-center text-[11px] text-slate-400">
                       <span>
@@ -1674,7 +1652,7 @@ ALTER TABLE habits ADD COLUMN IF NOT EXISTS clean_streak INTEGER DEFAULT 0;`;
           </section>
         )}
 
-        {/* TAB MỚI: BẢNG AI INSIGHT PHÂN TÍCH HỌC TẬP & PHẢN BIỆN THÓI QUEN */}
+        {/* TAB: AI INSIGHT PHÂN TÍCH HỌC TẬP */}
         {activeTab === "AI_INSIGHTS" && (
           <section className="space-y-5">
             <div
@@ -1715,7 +1693,6 @@ ALTER TABLE habits ADD COLUMN IF NOT EXISTS clean_streak INTEGER DEFAULT 0;`;
                 </div>
               </div>
 
-              {/* 3 Chỉ số Phân tích Cốt lõi */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="p-4 rounded-xl bg-black/25 border border-slate-800 space-y-2">
                   <div className="flex items-center justify-between">
@@ -1778,7 +1755,6 @@ ALTER TABLE habits ADD COLUMN IF NOT EXISTS clean_streak INTEGER DEFAULT 0;`;
                 </div>
               </div>
 
-              {/* Nhật ký Nghiệm thu các phiên Deep Work */}
               <div className="pt-3 space-y-3">
                 <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
                   <span>📓 Nhật ký Nghiệm thu Phiên học (Focus Session Logs)</span>
@@ -1829,7 +1805,7 @@ ALTER TABLE habits ADD COLUMN IF NOT EXISTS clean_streak INTEGER DEFAULT 0;`;
           </section>
         )}
 
-        {/* TAB 2: SƠ ĐỒ XẾP CHỒNG THÓI QUEN (HABIT STACKING) */}
+        {/* TAB: SƠ ĐỒ HABIT STACKING */}
         {activeTab === "STACK" && (
           <section
             className={`rounded-2xl p-6 border space-y-6 ${
@@ -1891,7 +1867,7 @@ ALTER TABLE habits ADD COLUMN IF NOT EXISTS clean_streak INTEGER DEFAULT 0;`;
           </section>
         )}
 
-        {/* TAB 3: BIỂU ĐỒ LƯỚI NHIỆT 12 TUẦN THỰC TẾ & TƯƠNG TÁC */}
+        {/* TAB: HEATMAP 12 TUẦN */}
         {activeTab === "HEATMAP" && (
           <section
             className={`rounded-2xl p-6 border space-y-5 ${
@@ -1951,7 +1927,6 @@ ALTER TABLE habits ADD COLUMN IF NOT EXISTS clean_streak INTEGER DEFAULT 0;`;
               })}
             </div>
 
-            {/* Chi tiết ngày đang chọn trên Heatmap */}
             <div className="p-4 rounded-xl bg-black/25 border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs">
               <div>
                 <span className="font-bold text-indigo-400 uppercase">
@@ -1980,7 +1955,7 @@ ALTER TABLE habits ADD COLUMN IF NOT EXISTS clean_streak INTEGER DEFAULT 0;`;
           </section>
         )}
 
-        {/* TAB 4: KHO PHẦN THƯỞNG (GAMIFIED REWARD STORE) */}
+        {/* TAB: KHO PHẦN THƯỞNG */}
         {activeTab === "REWARDS" && (
           <section
             className={`rounded-2xl p-6 border space-y-6 ${
@@ -2070,7 +2045,7 @@ ALTER TABLE habits ADD COLUMN IF NOT EXISTS clean_streak INTEGER DEFAULT 0;`;
           </section>
         )}
 
-        {/* MODAL NGHIỆM THU PHIÊN TẬP TRUNG (POST-SESSION REFLECTION) */}
+        {/* MODAL NGHIỆM THU PHIÊN TẬP TRUNG */}
         {isReflectionOpen && (
           <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 z-50">
             <div className="bg-[#131826] border border-indigo-500/40 rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4 text-slate-100">
@@ -2160,7 +2135,7 @@ ALTER TABLE habits ADD COLUMN IF NOT EXISTS clean_streak INTEGER DEFAULT 0;`;
           </div>
         )}
 
-        {/* MODAL PHẢN TỈNH ĐẾM NGƯỢC 5 GIÂY KHI TÁI PHẠM THÓI QUEN XẤU */}
+        {/* MODAL PHẢN TỈNH ĐẾM NGƯỢC 5 GIÂY */}
         {relapseTarget && (
           <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 z-50">
             <div className="bg-[#191219] border border-rose-800/60 rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-5 text-slate-100">
@@ -2472,7 +2447,7 @@ ALTER TABLE habits ADD COLUMN IF NOT EXISTS clean_streak INTEGER DEFAULT 0;`;
           </div>
         )}
 
-        {/* MODAL LẤY MÃ SQL SUPABASE */}
+        {/* MODAL MÃ SQL SUPABASE */}
         {isSqlModalOpen && (
           <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 z-50">
             <div className="bg-[#131826] border border-slate-800 rounded-3xl p-6 w-full max-w-lg shadow-2xl space-y-4 text-slate-100">
